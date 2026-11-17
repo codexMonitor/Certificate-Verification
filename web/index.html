@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Certificate Verification (Ganache)</title>
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --ink:#1b1f27; --mut:#667085; --line:#e3e6eb; --pri:#2457d6; --ok:#13795b; --bad:#b42318; --warn:#b54708; --okbg:#e7f6ef; --badbg:#fdecea; --warnbg:#fff4e5; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--ink); }
+  header { background:#10244f; color:#fff; padding:18px 24px; }
+  header h1 { margin:0; font-size:20px; } header p { margin:2px 0 0; color:#b9c6e8; font-size:13px; }
+  main { max-width:1050px; margin:20px auto; padding:0 16px; display:grid; gap:16px; grid-template-columns:1fr 1fr; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  .full { grid-column:1 / -1; }
+  h2 { margin:0 0 10px; font-size:16px; }
+  label { display:block; font-size:12px; color:var(--mut); margin:10px 0 3px; text-transform:uppercase; letter-spacing:.03em; }
+  input, select, textarea { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:7px; font:inherit; background:#fff; }
+  input[type=file] { padding:6px; }
+  button { padding:8px 14px; border:0; border-radius:7px; background:var(--pri); color:#fff; font:inherit; cursor:pointer; margin-top:10px; margin-right:6px; }
+  button.sec { background:#e8ecf5; color:var(--ink); } button.danger { background:var(--bad); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .kv { display:grid; grid-template-columns:130px 1fr; gap:4px 10px; font-size:14px; }
+  .kv div:nth-child(odd) { color:var(--mut); } .mono { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; word-break:break-all; }
+  .badge { display:inline-block; padding:2px 10px; border-radius:999px; font-weight:600; font-size:13px; }
+  .b-ok { background:var(--okbg); color:var(--ok); } .b-bad { background:var(--badbg); color:var(--bad); } .b-warn { background:var(--warnbg); color:var(--warn); }
+  .status { margin-top:12px; padding:10px 12px; border-radius:8px; font-size:14px; display:none; white-space:pre-wrap; word-break:break-word; }
+  .status.show { display:block; } .status.pending { background:var(--warnbg); color:var(--warn); } .status.success { background:var(--okbg); color:var(--ok); } .status.error { background:var(--badbg); color:var(--bad); }
+  table { width:100%; border-collapse:collapse; font-size:13px; } th,td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:top; } th { color:var(--mut); font-weight:600; }
+  .hint { color:var(--mut); font-size:12.5px; margin-top:4px; }
+  @media (max-width:760px){ main { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Certificate Verification</h1>
+  <p>DS 441 mini project &middot; Solidity + ethers.js &middot; local Ganache blockchain (test Ether only)</p>
+</header>
+
+<main>
+  <!-- WALLET -->
+  <section class="card">
+    <h2>1. Wallet &amp; network</h2>
+    <label>Connection mode</label>
+    <select id="mode">
+      <option value="ganache">Ganache accounts (no extension needed)</option>
+      <option value="metamask">MetaMask wallet</option>
+    </select>
+    <div id="acctRow">
+      <label>Account</label>
+      <select id="accountSelect"></select>
+    </div>
+    <button id="connectBtn">Connect</button>
+    <div class="kv" style="margin-top:14px">
+      <div>Network</div><div id="netInfo">not connected</div>
+      <div>Account</div><div class="mono" id="acctInfo">&ndash;</div>
+      <div>Balance</div><div id="balInfo">&ndash;</div>
+      <div>Role</div><div id="roleInfo">&ndash;</div>
+    </div>
+  </section>
+
+  <!-- CONTRACT -->
+  <section class="card">
+    <h2>Contract data</h2>
+    <div class="kv">
+      <div>Address</div><div class="mono" id="cAddr">&ndash;</div>
+      <div>Issuer</div><div class="mono" id="cIssuer">&ndash;</div>
+      <div>Total issued</div><div id="cTotal">&ndash;</div>
+      <div>Latest block</div><div id="cBlock">&ndash;</div>
+    </div>
+    <div class="hint">Only the issuer account can issue or revoke. This is enforced in the smart contract itself, not just here.</div>
+  </section>
+
+  <!-- ISSUE / REVOKE -->
+  <section class="card">
+    <h2>2. Issue a certificate (issuer)</h2>
+    <label>Certificate ID (unique)</label>
+    <input id="issueId" placeholder="e.g. DTU-2026-0001">
+    <label>Recipient address</label>
+    <input id="issueRecipient" placeholder="0x...">
+    <div class="hint">Tip: pick a different Ganache account, e.g. account #1. <a href="#" id="fillRecipient">Use account #1</a></div>
+    <label>Document (computes keccak256 hash)</label>
+    <input type="file" id="issueFile">
+    <label>&hellip;or text content</label>
+    <textarea id="issueText" rows="2" placeholder="Bachelor of Data Science - Tran Bao Duy"></textarea>
+    <label>Document hash (bytes32)</label>
+    <input id="issueHash" class="mono" placeholder="0x...">
+    <button id="issueBtn">Issue certificate</button>
+  </section>
+
+  <section class="card">
+    <h2>3. Revoke a certificate (issuer)</h2>
+    <label>Certificate ID</label>
+    <input id="revokeId" placeholder="e.g. DTU-2026-0001">
+    <button class="danger" id="revokeBtn">Revoke certificate</button>
+    <div class="hint">Revoked certificates stay on-chain but are no longer valid. Their IDs cannot be reused.</div>
+    <h2 style="margin-top:22px">Transaction status</h2>
+    <div id="status" class="status"></div>
+    <div class="hint" id="statusHint">Every action is simulated first to decode the exact contract error, then sent as a transaction.</div>
+  </section>
+
+  <!-- VERIFY -->
+  <section class="card full">
+    <h2>4. Verify a certificate (anyone)</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px" id="verifyGrid">
+      <div>
+        <label>Certificate ID</label>
+        <input id="verifyId" placeholder="e.g. DTU-2026-0001">
+      </div>
+      <div>
+        <label>Document (optional - checks the hash)</label>
+        <input type="file" id="verifyFile">
+        <textarea id="verifyText" rows="1" placeholder="&hellip;or text content" style="margin-top:6px"></textarea>
+      </div>
+    </div>
+    <button id="verifyBtn">Verify</button>
+    <div id="verifyResult" style="margin-top:14px"></div>
+  </section>
+
+  <!-- EVENTS -->
+  <section class="card full">
+    <h2>Event log (from the blockchain)</h2>
+    <table>
+      <thead><tr><th>Block</th><th>Event</th><th>Certificate ID</th><th>Details</th><th>Tx</th></tr></thead>
+      <tbody id="events"><tr><td colspan="5" class="hint">Connect to load events.</td></tr></tbody>
+    </table>
+  </section>
+</main>
+
+<script src="/ethers.min.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+let config, rpc, signer, account, contract, readContract, accounts = [];
+
+function setStatus(kind, msg) { const s = $("status"); s.className = "status show " + kind; s.textContent = msg; }
+function short(a) { return a ? a.slice(0, 8) + "…" + a.slice(-6) : "–"; }
+function esc(x) { return String(x).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+// Turn any ethers/Ganache error into a readable sentence.
+function explain(e) {
+  const name = e.revert && e.revert.name;
+  const map = {
+    NotIssuer: "Rejected: only the issuer account may do this (unauthorized caller).",
+    DuplicateId: "Rejected: this certificate ID already exists (duplicate IDs are not allowed).",
+    UnknownId: "Rejected: no certificate with this ID exists.",
+    AlreadyRevoked: "Rejected: this certificate is already revoked.",
+    EmptyId: "Rejected: certificate ID cannot be empty.",
+    ZeroRecipient: "Rejected: recipient cannot be the zero address.",
+    EmptyHash: "Rejected: document hash cannot be empty.",
+    ZeroAddress: "Rejected: zero address not allowed.",
+  };
+  if (name && map[name]) return map[name] + "  [" + name + "]";
+  if (e.code === "ACTION_REJECTED" || e.code === 4001) return "Transaction rejected in the wallet.";
+  return (e.shortMessage || e.reason || e.message || String(e)).split("\n")[0];
+}
+
+async function hashFrom(fileEl, textEl) {
+  if (fileEl.files[0]) return ethers.keccak256(new Uint8Array(await fileEl.files[0].arrayBuffer()));
+  if (textEl.value) return ethers.keccak256(ethers.toUtf8Bytes(textEl.value));
+  return null;
+}
+$("issueFile").onchange = async () => { const h = await hashFrom($("issueFile"), $("issueText")); if (h) $("issueHash").value = h; };
+$("issueText").oninput = async () => { if (!$("issueFile").files[0]) { const h = await hashFrom($("issueFile"), $("issueText")); $("issueHash").value = h || ""; } };
+$("fillRecipient").onclick = (e) => { e.preventDefault(); if (accounts[1]) $("issueRecipient").value = accounts[1]; };
+
+async function loadConfig() {
+  config = await (await fetch("/config.json", { cache: "no-store" })).json();
+  $("cAddr").textContent = config.address;
+}
+
+async function populateAccounts() {
+  if ($("mode").value === "ganache") {
+    rpc = new ethers.JsonRpcProvider(config.rpcUrl);
+    accounts = (await rpc.send("eth_accounts", [])).map(ethers.getAddress);
+    $("accountSelect").innerHTML = accounts.map((a, i) => `<option value="${i}">#${i}  ${a}</option>`).join("");
+    $("acctRow").style.display = "";
+  } else {
+    $("acctRow").style.display = "none";
+  }
+}
+$("mode").onchange = () => populateAccounts().catch((e) => setStatus("error", explain(e)));
+
+async function connect() {
+  try {
+    setStatus("pending", "Connecting…");
+    let provider;
+    if ($("mode").value === "metamask") {
+      if (!window.ethereum) throw new Error("MetaMask not found. Use the Ganache accounts mode, or install MetaMask.");
+      provider = new ethers.BrowserProvider(window.ethereum);
+      await provider.send("eth_requestAccounts", []);
+      try { await provider.send("wallet_switchEthereumChain", [{ chainId: "0x" + config.chainId.toString(16) }]); }
+      catch (err) {
+        await provider.send("wallet_addEthereumChain", [{ chainId: "0x" + config.chainId.toString(16), chainName: "Ganache Local", rpcUrls: [config.rpcUrl], nativeCurrency: { name: "Test Ether", symbol: "ETH", decimals: 18 } }]);
+      }
+      provider = new ethers.BrowserProvider(window.ethereum);
+      signer = await provider.getSigner();
+      accounts = await provider.send("eth_accounts", []);
+      window.ethereum.on && window.ethereum.on("accountsChanged", () => connect());
+    } else {
+      provider = new ethers.JsonRpcProvider(config.rpcUrl);
+      signer = await provider.getSigner(Number($("accountSelect").value || 0));
+      accounts = (await provider.send("eth_accounts", [])).map(ethers.getAddress);
+    }
+    account = await signer.getAddress();
+    const net = await provider.getNetwork();
+    if (Number(net.chainId) !== config.chainId) throw new Error(`Wrong network (chainId ${net.chainId}); expected ${config.chainId} (Ganache).`);
+    contract = new ethers.Contract(config.address, config.abi, signer);
+    readContract = new ethers.Contract(config.address, config.abi, provider);
+    if ((await provider.getCode(config.address)) === "0x") throw new Error("No contract at the configured address. Re-run: npm run deploy");
+    $("netInfo").textContent = `Ganache (chainId ${net.chainId}) @ ${config.rpcUrl}`;
+    $("acctInfo").textContent = account;
+    await refresh(provider);
+    await loadEvents(provider);
+    setStatus("success", "Connected as " + account);
+  } catch (e) { setStatus("error", explain(e)); }
+}
+$("connectBtn").onclick = connect;
+
+// ethers caches the block number for a few seconds; ask the node directly so the UI is never stale.
+async function freshBlock(provider) { return parseInt(await provider.send("eth_blockNumber", []), 16); }
+
+async function refresh(provider) {
+  provider = provider || signer.provider;
+  const [issuer, total, block, bal] = await Promise.all([readContract.issuer(), readContract.totalIssued(), freshBlock(provider), provider.getBalance(account)]);
+  $("cIssuer").textContent = issuer;
+  $("cTotal").textContent = total.toString();
+  $("cBlock").textContent = block;
+  $("balInfo").textContent = Number(ethers.formatEther(bal)).toFixed(4) + " test ETH";
+  const isIssuer = issuer.toLowerCase() === account.toLowerCase();
+  $("roleInfo").innerHTML = isIssuer ? '<span class="badge b-ok">Issuer</span>' : '<span class="badge b-warn">Not the issuer (read-only / will be rejected)</span>';
+}
+
+// Simulate first (decodes custom errors), then send, then wait for the receipt.
+async function act(label, method, args) {
+  if (!contract) return setStatus("error", "Connect a wallet first.");
+  try {
+    setStatus("pending", `${label}: simulating…`);
+    await contract[method].staticCall(...args);
+  } catch (e) {
+    return setStatus("error", `${label} would fail.\n${explain(e)}\n\nNo transaction was sent, nothing changed on-chain.`);
+  }
+  try {
+    setStatus("pending", `${label}: confirm / sending transaction…`);
+    const tx = await contract[method](...args);
+    setStatus("pending", `${label}: pending… tx ${short(tx.hash)}`);
+    const r = await tx.wait();
+    setStatus("success", `${label}: confirmed in block ${r.blockNumber}\ntx ${tx.hash}\ngas used ${r.gasUsed}`);
+    await refresh(); await loadEvents();
+  } catch (e) { setStatus("error", `${label} failed.\n${explain(e)}`); }
+}
+
+$("issueBtn").onclick = async () => {
+  const id = $("issueId").value.trim(), rec = $("issueRecipient").value.trim(), h = $("issueHash").value.trim();
+  if (!ethers.isAddress(rec)) return setStatus("error", "Recipient must be a valid address.");
+  if (!/^0x[0-9a-fA-F]{64}$/.test(h)) return setStatus("error", "Provide a document (file or text) so a 32-byte hash is computed.");
+  await act("Issue certificate", "issue", [id, rec, h]);
+};
+$("revokeBtn").onclick = async () => { await act("Revoke certificate", "revoke", [$("revokeId").value.trim()]); };
+
+$("verifyBtn").onclick = async () => {
+  const out = $("verifyResult");
+  try {
+    if (!readContract) throw new Error("Connect first.");
+    const id = $("verifyId").value.trim();
+    const h = await hashFrom($("verifyFile"), $("verifyText"));
+    const [exists] = await readContract.verify(id, h || ethers.ZeroHash);
+    if (!exists) { out.innerHTML = '<span class="badge b-bad">NOT FOUND</span> No certificate with this ID.'; return; }
+    const c = await readContract.getCertificate(id);
+    const valid = await readContract.isValid(id);
+    let hashLine = '<div class="hint">No document supplied, hash not checked.</div>';
+    if (h) {
+      const m = h.toLowerCase() === c.docHash.toLowerCase();
+      hashLine = `<div style="margin-top:6px">Hash check: ${m ? '<span class="badge b-ok">MATCHES</span>' : '<span class="badge b-bad">DOES NOT MATCH — document differs from the issued one</span>'}</div>`;
+    }
+    out.innerHTML = `
+      <div>Current validity: ${valid ? '<span class="badge b-ok">VALID</span>' : '<span class="badge b-bad">REVOKED / INVALID</span>'}</div>
+      ${hashLine}
+      <div class="kv" style="margin-top:10px">
+        <div>Certificate ID</div><div>${esc(c.id)}</div>
+        <div>Recipient</div><div class="mono">${esc(c.recipient)}</div>
+        <div>Recorded hash</div><div class="mono">${esc(c.docHash)}</div>
+        <div>Issued at</div><div>${new Date(Number(c.issuedAt) * 1000).toLocaleString()}</div>
+        <div>Revoked at</div><div>${c.revoked ? new Date(Number(c.revokedAt) * 1000).toLocaleString() : "–"}</div>
+      </div>`;
+  } catch (e) { out.innerHTML = '<span class="badge b-bad">ERROR</span> ' + esc(explain(e)); }
+};
+
+async function loadEvents(provider) {
+  provider = provider || signer.provider;
+  const head = await freshBlock(provider);
+  const logs = await provider.getLogs({ address: config.address, fromBlock: 0, toBlock: head });
+  const rows = logs.map((l) => { try { return { l, p: readContract.interface.parseLog(l) }; } catch { return null; } }).filter(Boolean).reverse();
+  $("events").innerHTML = rows.length ? rows.map(({ l, p }) => {
+    let d = "";
+    if (p.name === "CertificateIssued") d = `recipient ${short(p.args.recipient)} · hash ${p.args.docHash.slice(0, 12)}…`;
+    else if (p.name === "CertificateRevoked") d = `revoked by ${short(p.args.revokedBy)}`;
+    else if (p.name === "IssuerTransferred") d = `${short(p.args.oldIssuer)} → ${short(p.args.newIssuer)}`;
+    const id = p.args.id !== undefined ? esc(p.args.id) : "–";
+    const cls = p.name === "CertificateRevoked" ? "b-bad" : "b-ok";
+    return `<tr><td>${l.blockNumber}</td><td><span class="badge ${cls}">${p.name}</span></td><td>${id}</td><td class="mono">${d}</td><td class="mono">${short(l.transactionHash)}</td></tr>`;
+  }).join("") : '<tr><td colspan="5" class="hint">No events yet.</td></tr>';
+}
+
+(async () => {
+  try { await loadConfig(); await populateAccounts(); }
+  catch (e) { setStatus("error", "Could not load config.json. Run 'npm run deploy' first, and make sure Ganache is running.\n" + explain(e)); }
+})();
+</script>
+</body>
+</html>

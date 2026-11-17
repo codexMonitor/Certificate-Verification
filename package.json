@@ -1,0 +1,17 @@
+{
+  "name": "certificate-verification",
+  "version": "1.0.0",
+  "description": "DS 441 mini project - certificate issuing/verification on Ganache",
+  "scripts": {
+    "ganache": "ganache --server.port 7545 --chain.chainId 1337 --chain.networkId 5777 --wallet.deterministic",
+    "compile": "node scripts/compile.js",
+    "deploy": "node scripts/deploy.js",
+    "test": "node test/test.js",
+    "serve": "node scripts/serve.js"
+  },
+  "dependencies": {
+    "ethers": "^6.13.0",
+    "ganache": "^7.9.2",
+    "solc": "^0.8.26"
+  }
+}

@@ -1,0 +1,25 @@
+
+> certificate-verification@1.0.0 test
+> node test/test.js
+
+Certificate Verification tests
+  PASS  issuer is deployer
+  PASS  issuer issues certificate + emits CertificateIssued
+  PASS  stored data is correct and certificate is valid
+  PASS  verify: correct hash -> valid
+  PASS  verify: wrong hash -> exists but not matching/valid
+  PASS  verify: unknown ID -> not found
+  PASS  REJECT duplicate ID (DuplicateId)
+  PASS  REJECT unauthorized issue by outsider (NotIssuer)
+  PASS  REJECT unauthorized issue by student (NotIssuer)
+  PASS  REJECT unauthorized revoke by outsider (NotIssuer)
+  PASS  outsider's forced transaction is mined as FAILED and changes nothing
+  PASS  still valid after failed attacks
+  PASS  REJECT empty ID / zero recipient / zero hash
+  PASS  REJECT revoke of unknown ID (UnknownId)
+  PASS  issuer revokes + emits CertificateRevoked
+  PASS  after revoke: isValid false, verify valid=false but hashMatch=true
+  PASS  REJECT double revoke (AlreadyRevoked)
+  PASS  revoked ID cannot be re-issued (DuplicateId)
+
+18 passed, 0 failed
